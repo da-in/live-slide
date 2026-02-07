@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { connectSocket, disconnectSocket, emitTranscript } from "@/lib/socket";
 import { getSpeechRecognition } from "@/lib/speech";
 import type { ActionPayload, SlideComponent } from "@/types/slide";
 import { mapComponent } from "@/lib/component-mapper";
+import cursorLogo from "@/assets/cursor-logo.png";
+import cursorKorea from "@/assets/cursur-korea.png";
 
 function isSlideComponent(c: unknown): c is SlideComponent {
   if (!c || typeof c !== "object" || !("type" in c)) return false;
@@ -43,12 +46,24 @@ function applyPayload(current: SlideComponent[], payload: ActionPayload): SlideC
   }
 }
 
+const THEME_STORAGE_KEY = "live-slide-theme";
+
 export default function PresentationPage() {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const [components, setComponents] = useState<SlideComponent[]>([]);
   const [subtitle, setSubtitle] = useState("");
   const [connected, setConnected] = useState(false);
+  const [theme, setTheme] = useState<"auto" | "hackathon" | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(THEME_STORAGE_KEY);
+      setTheme(stored === "hackathon" ? "hackathon" : "auto");
+    } catch {
+      setTheme("auto");
+    }
+  }, []);
 
   useEffect(() => {
     const t = requestAnimationFrame(() => {
@@ -104,11 +119,36 @@ export default function PresentationPage() {
     };
   }, []);
 
+  const isHackathonTheme = theme === "hackathon";
+
   return (
     <div
-      className="min-h-screen bg-gray-900 transition-opacity duration-[600ms] ease-out"
+      className={`min-h-screen transition-opacity duration-[600ms] ease-out ${isHackathonTheme ? "bg-black" : "bg-gray-900"}`}
       style={{ opacity: isVisible ? 1 : 0 }}
     >
+      {isHackathonTheme ? (
+        <>
+          <div className="pointer-events-none fixed top-8 right-8 z-10">
+            <Image
+              src={cursorLogo}
+              alt=""
+              width={280}
+              height={93}
+              className="h-20 w-auto object-contain"
+            />
+          </div>
+          <div className="pointer-events-none fixed bottom-8 left-1/2 z-10 -translate-x-1/2">
+            <Image
+              src={cursorKorea}
+              alt=""
+              width={240}
+              height={80}
+              className="h-16 w-auto object-contain"
+            />
+          </div>
+        </>
+      ) : null}
+
       <main className="mx-auto flex min-h-screen max-w-4xl flex-col justify-center gap-8 px-8 py-12">
         {components.length === 0 ? (
           <p className="text-center text-gray-500">슬라이드 내용이 없습니다.</p>

@@ -2,7 +2,7 @@
 
 import { useState, useId, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { PresentationSummary, BackgroundTheme } from "@/types/presentation";
+import type { Presentation, BackgroundTheme } from "@/types/presentation";
 import { getStoredPresentations, setStoredPresentations } from "@/lib/presentation-storage";
 
 const BACKGROUND_OPTIONS: { value: BackgroundTheme; label: string }[] = [
@@ -18,7 +18,7 @@ function PresentationList({
   onCreate,
   onDelete,
 }: {
-  presentations: PresentationSummary[];
+  presentations: Presentation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
@@ -99,10 +99,16 @@ function PresentationForm({
   presentation,
   onSubmit,
   onTitleChange,
+  onContextChange,
+  onThemeChange,
+  onAttachedFileNamesChange,
 }: {
-  presentation: PresentationSummary | null;
+  presentation: Presentation | null;
   onSubmit: (data: { context: string; files: File[]; background: BackgroundTheme }) => void;
   onTitleChange: (title: string) => void;
+  onContextChange: (id: string, context: string) => void;
+  onThemeChange: (id: string, background: BackgroundTheme) => void;
+  onAttachedFileNamesChange: (id: string, names: string[]) => void;
 }) {
   const [context, setContext] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -111,6 +117,13 @@ function PresentationForm({
   const contextId = useId();
   const filesId = useId();
   const backgroundId = useId();
+
+  useEffect(() => {
+    if (presentation) {
+      setContext(presentation.context);
+      setBackground(presentation.background);
+    }
+  }, [presentation?.id, presentation?.context, presentation?.background]);
 
   if (!presentation) {
     return (
@@ -128,7 +141,9 @@ function PresentationForm({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
     if (!selected) return;
-    setFiles(Array.from(selected));
+    const list = Array.from(selected);
+    setFiles(list);
+    onAttachedFileNamesChange(presentation.id, list.map((f) => f.name));
   };
 
   return (
@@ -158,17 +173,21 @@ function PresentationForm({
           <textarea
             id={contextId}
             value={context}
-            onChange={(e) => setContext(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setContext(v);
+              onContextChange(presentation.id, v);
+            }}
             rows={4}
             placeholder="발표 주제, 대상, 참고할 내용 등을 입력하세요."
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
           />
         </div>
 
-        {/* 배경 설정 */}
+        {/* 발표 테마 */}
         <div>
           <label htmlFor={backgroundId} className="mb-1.5 block text-sm font-medium text-gray-700">
-            배경
+            발표 테마
           </label>
           <div id={backgroundId} className="flex flex-wrap gap-2">
             {BACKGROUND_OPTIONS.map((opt) => (
@@ -181,7 +200,10 @@ function PresentationForm({
                   name="background"
                   value={opt.value}
                   checked={background === opt.value}
-                  onChange={() => setBackground(opt.value)}
+                  onChange={() => {
+                    setBackground(opt.value);
+                    onThemeChange(presentation.id, opt.value);
+                  }}
                   className="h-4 w-4 border-gray-300 text-gray-900 focus:ring-gray-900"
                 />
                 <span className="text-sm text-gray-700">{opt.label}</span>
@@ -203,8 +225,12 @@ function PresentationForm({
             onChange={handleFileChange}
             className="w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-4 file:py-2 file:text-gray-700 file:transition hover:file:bg-gray-200"
           />
-          {files.length > 0 && (
-            <p className="mt-1.5 text-sm text-gray-500">{files.length}개 파일 선택됨</p>
+          {(files.length > 0 || presentation.attachedFileNames.length > 0) && (
+            <p className="mt-1.5 text-sm text-gray-500">
+              {files.length > 0
+                ? `${files.length}개 파일 선택됨`
+                : `이전 선택: ${presentation.attachedFileNames.join(", ")}`}
+            </p>
           )}
         </div>
 
@@ -220,20 +246,27 @@ function PresentationForm({
 }
 
 /** 시작 화면: 좌측 발표 선택, 우측 사전 정보 입력 */
+const defaultPresentation = (id: string, title: string): Presentation => ({
+  id,
+  title,
+  createdAt: Date.now(),
+  context: "",
+  background: "auto",
+  attachedFileNames: [],
+});
+
 export default function StartScreen() {
   const router = useRouter();
-  const [presentations, setPresentations] = useState<PresentationSummary[]>([]);
+  const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  // 새로고침 시 localStorage에서 복원
   useEffect(() => {
     setPresentations(getStoredPresentations());
     setHasLoaded(true);
   }, []);
 
-  // 로드 완료 후, 발표 목록이 바뀔 때마다 저장
   useEffect(() => {
     if (!hasLoaded) return;
     setStoredPresentations(presentations);
@@ -246,7 +279,7 @@ export default function StartScreen() {
   const handleCreate = () => {
     const id = `p-${Date.now()}`;
     setPresentations((prev) => [
-      { id, title: `새 발표 ${prev.length + 1}`, createdAt: Date.now() },
+      defaultPresentation(id, `새 발표 ${prev.length + 1}`),
       ...prev,
     ]);
     setSelectedId(id);
@@ -259,15 +292,38 @@ export default function StartScreen() {
     );
   };
 
+  const handleContextChange = (id: string, context: string) => {
+    setPresentations((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, context } : p))
+    );
+  };
+
+  const handleThemeChange = (id: string, background: BackgroundTheme) => {
+    setPresentations((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, background } : p))
+    );
+  };
+
+  const handleAttachedFileNamesChange = (id: string, attachedFileNames: string[]) => {
+    setPresentations((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, attachedFileNames } : p))
+    );
+  };
+
   const handleDelete = (id: string) => {
     setPresentations((prev) => prev.filter((p) => p.id !== id));
     if (selectedId === id) setSelectedId(null);
   };
 
   const handleSubmit = (data: { context: string; files: File[]; background: BackgroundTheme }) => {
+    try {
+      sessionStorage.setItem("live-slide-theme", data.background);
+    } catch {
+      // ignore
+    }
     setIsFadingOut(true);
     setTimeout(() => {
-      // TODO: 서버로 컨텍스트·파일·배경 전송
+      // TODO: 서버로 컨텍스트·파일·테마 전송
       router.push("/presentation");
     }, 500);
   };
@@ -293,6 +349,9 @@ export default function StartScreen() {
           presentation={selected}
           onSubmit={handleSubmit}
           onTitleChange={handleTitleChange}
+          onContextChange={handleContextChange}
+          onThemeChange={handleThemeChange}
+          onAttachedFileNamesChange={handleAttachedFileNamesChange}
         />
       </div>
     </div>
