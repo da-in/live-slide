@@ -1,5 +1,5 @@
-import SttSocketPanel from "@/components/SttSocketPanel";
+import StartScreen from "@/components/StartScreen";
 
 export default function Home() {
-  return <SttSocketPanel />;
+  return <StartScreen />;
 }
