@@ -1,10 +1,54 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import SttSocketPanel from "@/components/SttSocketPanel";
+import { useRouter } from "next/navigation";
+import { connectSocket, disconnectSocket, emitTranscript } from "@/lib/socket";
+import { getSpeechRecognition } from "@/lib/speech";
+import type { ActionPayload, SlideComponent } from "@/types/slide";
+import { mapComponent } from "@/lib/component-mapper";
+
+function isSlideComponent(c: unknown): c is SlideComponent {
+  if (!c || typeof c !== "object" || !("type" in c)) return false;
+  const t = (c as { type: string }).type;
+  if (t === "TITLE" || t === "DESCRIPTION") {
+    return "content" in c && typeof (c as { content?: unknown }).content === "string";
+  }
+  if (t === "IMAGE") {
+    return "src" in c && typeof (c as { src?: unknown }).src === "string";
+  }
+  return false;
+}
+
+function normalizePayload(payload: unknown): ActionPayload | null {
+  if (!payload || typeof payload !== "object" || !("type" in payload)) return null;
+  const p = payload as Record<string, unknown>;
+  const type = p.type as string;
+  if (type !== "SLIDE_UPDATE" && type !== "SLIDE_CLEAR" && type !== "SLIDE_APPEND") return null;
+  const components = Array.isArray(p.components)
+    ? (p.components as unknown[]).filter(isSlideComponent)
+    : undefined;
+  return { type, components, timestamp: typeof p.timestamp === "number" ? p.timestamp : undefined };
+}
+
+function applyPayload(current: SlideComponent[], payload: ActionPayload): SlideComponent[] {
+  switch (payload.type) {
+    case "SLIDE_UPDATE":
+      return payload.components ?? [];
+    case "SLIDE_CLEAR":
+      return [];
+    case "SLIDE_APPEND":
+      return [...current, ...(payload.components ?? [])];
+    default:
+      return current;
+  }
+}
 
 export default function PresentationPage() {
+  const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
+  const [components, setComponents] = useState<SlideComponent[]>([]);
+  const [subtitle, setSubtitle] = useState("");
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     const t = requestAnimationFrame(() => {
@@ -13,12 +57,95 @@ export default function PresentationPage() {
     return () => cancelAnimationFrame(t);
   }, []);
 
+  useEffect(() => {
+    const socket = connectSocket();
+    setConnected(socket.connected);
+
+    socket.on("connect", () => setConnected(true));
+    socket.on("disconnect", () => setConnected(false));
+
+    const onSlideUpdate = (payload: unknown) => {
+      const normalized = normalizePayload(payload);
+      if (normalized) setComponents((prev) => applyPayload(prev, normalized));
+    };
+
+    socket.on("slide-update", onSlideUpdate);
+
+    return () => {
+      socket.off("slide-update", onSlideUpdate);
+      socket.off("connect");
+      socket.off("disconnect");
+      disconnectSocket();
+    };
+  }, []);
+
+  // 프레젠테이션 진입 시 연결한 같은 소켓으로 전사 전송 → 서버가 이 소켓에 slide-update 응답
+  useEffect(() => {
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "ko-KR";
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const result = event.results[event.resultIndex];
+      const text = result[0].transcript.trim();
+      const isFinal = result.isFinal;
+      setSubtitle(text);
+      emitTranscript(text, isFinal);
+    };
+
+    recognition.start();
+
+    return () => {
+      recognition.stop();
+    };
+  }, []);
+
   return (
     <div
       className="min-h-screen bg-gray-900 transition-opacity duration-[600ms] ease-out"
       style={{ opacity: isVisible ? 1 : 0 }}
     >
-      <SttSocketPanel />
+      <main className="mx-auto flex min-h-screen max-w-4xl flex-col justify-center gap-8 px-8 py-12">
+        {components.length === 0 ? (
+          <p className="text-center text-gray-500">슬라이드 내용이 없습니다.</p>
+        ) : (
+          components.map((comp, i) => mapComponent(comp, i))
+        )}
+      </main>
+
+      {subtitle ? (
+        <div className="fixed bottom-16 left-0 right-0 flex justify-center px-4 pb-2">
+          <p className="max-w-3xl rounded-lg bg-black/70 px-4 py-3 text-center text-lg leading-relaxed text-white">
+            {subtitle}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="fixed bottom-4 left-4 flex items-center gap-2 text-xs text-gray-500">
+        <span
+          className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+            connected ? "bg-green-500" : "bg-red-500"
+          }`}
+          aria-hidden
+        />
+        <span>{connected ? "서버 연결됨 (localhost:8000)" : "서버 미연결"}</span>
+      </div>
+
+      <a
+        href="/"
+        onClick={(e) => {
+          e.preventDefault();
+          router.push("/");
+        }}
+        className="fixed bottom-4 right-4 rounded px-2.5 py-1.5 text-xs text-gray-500 opacity-40 transition-opacity duration-200 hover:opacity-90 focus:opacity-90 focus:outline-none"
+        aria-label="발표 종료"
+      >
+        발표 종료
+      </a>
     </div>
   );
 }

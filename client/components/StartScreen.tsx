@@ -16,11 +16,13 @@ function PresentationList({
   selectedId,
   onSelect,
   onCreate,
+  onDelete,
 }: {
   presentations: PresentationSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  onDelete: (id: string) => void;
 }) {
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-gray-200 bg-gray-50">
@@ -42,21 +44,49 @@ function PresentationList({
           </p>
         ) : (
           <ul className="space-y-1">
-            {presentations.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(p.id)}
-                  className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
-                    selectedId === p.id
-                      ? "bg-gray-200 text-gray-900 font-medium"
-                      : "text-gray-700 hover:bg-gray-100"
+            {presentations.map((p) => {
+              const isSelected = selectedId === p.id;
+              return (
+                <li
+                  key={p.id}
+                  className={`flex items-center gap-1 rounded-lg transition ${
+                    isSelected ? "bg-gray-200" : "hover:bg-gray-100"
                   }`}
                 >
-                  {p.title}
-                </button>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(p.id)}
+                    className={`min-w-0 flex-1 px-3 py-2.5 text-left text-sm transition ${
+                      isSelected ? "text-gray-900 font-medium" : "text-gray-700"
+                    }`}
+                  >
+                    {p.title}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(p.id);
+                    }}
+                    className={`shrink-0 rounded p-1.5 transition-colors ${
+                      isSelected
+                        ? "text-gray-600 hover:text-red-600"
+                        : "text-gray-400 hover:text-red-500"
+                    }`}
+                    aria-label={`${p.title} 삭제`}
+                    title="발표 삭제"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </nav>
@@ -107,7 +137,6 @@ function PresentationForm({
         <div>
           <label htmlFor="presentation-title" className="mb-1.5 block text-sm font-medium text-gray-700">
             발표 제목
-            <span className="ml-1.5 font-normal text-gray-400">(클릭하여 수정)</span>
           </label>
           <input
             id="presentation-title"
@@ -118,7 +147,6 @@ function PresentationForm({
             className="w-full rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2.5 text-lg font-semibold text-gray-900 placeholder-gray-400 transition hover:border-gray-300 hover:bg-gray-50 focus:border-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1"
             aria-label="발표 제목"
           />
-          <p className="mt-1 text-sm text-gray-500">사전 정보를 입력하고 발표를 시작하세요.</p>
         </div>
 
         {/* 발표에 대한 사전 정보 입력 */}
@@ -126,6 +154,7 @@ function PresentationForm({
           <label htmlFor={contextId} className="mb-1.5 block text-sm font-medium text-gray-700">
             발표에 대한 사전 정보
           </label>
+          <p className="mt-1 text-sm text-gray-500">사전 정보를 입력하고 발표를 시작하세요.</p>
           <textarea
             id={contextId}
             value={context}
@@ -134,24 +163,6 @@ function PresentationForm({
             placeholder="발표 주제, 대상, 참고할 내용 등을 입력하세요."
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
           />
-        </div>
-
-        {/* 발표에서 활용할 자료 */}
-        <div>
-          <label htmlFor={filesId} className="mb-1.5 block text-sm font-medium text-gray-700">
-            활용할 자료 (선택)
-          </label>
-          <input
-            id={filesId}
-            type="file"
-            multiple
-            accept="*/*"
-            onChange={handleFileChange}
-            className="w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-4 file:py-2 file:text-gray-700 file:transition hover:file:bg-gray-200"
-          />
-          {files.length > 0 && (
-            <p className="mt-1.5 text-sm text-gray-500">{files.length}개 파일 선택됨</p>
-          )}
         </div>
 
         {/* 배경 설정 */}
@@ -177,6 +188,24 @@ function PresentationForm({
               </label>
             ))}
           </div>
+        </div>
+
+        {/* 발표에서 활용할 자료 */}
+        <div>
+          <label htmlFor={filesId} className="mb-1.5 block text-sm font-medium text-gray-700">
+            활용할 자료 (선택)
+          </label>
+          <input
+            id={filesId}
+            type="file"
+            multiple
+            accept="*/*"
+            onChange={handleFileChange}
+            className="w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-4 file:py-2 file:text-gray-700 file:transition hover:file:bg-gray-200"
+          />
+          {files.length > 0 && (
+            <p className="mt-1.5 text-sm text-gray-500">{files.length}개 파일 선택됨</p>
+          )}
         </div>
 
         <button
@@ -230,6 +259,11 @@ export default function StartScreen() {
     );
   };
 
+  const handleDelete = (id: string) => {
+    setPresentations((prev) => prev.filter((p) => p.id !== id));
+    if (selectedId === id) setSelectedId(null);
+  };
+
   const handleSubmit = (data: { context: string; files: File[]; background: BackgroundTheme }) => {
     setIsFadingOut(true);
     setTimeout(() => {
@@ -253,6 +287,7 @@ export default function StartScreen() {
           selectedId={selectedId}
           onSelect={setSelectedId}
           onCreate={handleCreate}
+          onDelete={handleDelete}
         />
         <PresentationForm
           presentation={selected}
