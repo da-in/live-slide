@@ -4,6 +4,7 @@
  */
 
 import { SYSTEM_PROMPT, getUserPrompt } from "./prompts/index.js";
+import { resolveImageComponents } from "./image.js";
 
 const OLLAMA_URL = "http://localhost:11434/api/chat";
 /** 12b는 품질 우선, 4b는 속도 우선 (지연 약 1/2~1/3 수준 기대) */
@@ -87,7 +88,10 @@ export async function processBatch(batchText, socketId) {
     const data = await res.json();
     const raw = data?.message?.content ?? "";
 
-    const payload = JSON.parse(raw);
+    let payload = JSON.parse(raw);
+
+    // ── IMAGE 컴포넌트의 키워드를 실제 URL로 교체 ──
+    payload = await resolveImageComponents(payload);
 
     // ── 맥락 갱신 ──
     // 전사: 최근 3건 유지
@@ -112,6 +116,7 @@ export async function processBatch(batchText, socketId) {
         payload.type
       } components=${payload.components?.length ?? 0} ${elapsed}ms`
     );
+    console.log(`[LLM] payload:`, JSON.stringify(payload, null, 2));
 
     return payload;
   } catch (err) {
