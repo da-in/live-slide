@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useId } from "react";
+import { useState, useId, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PresentationSummary, BackgroundTheme } from "@/types/presentation";
+import { getStoredPresentations, setStoredPresentations } from "@/lib/presentation-storage";
 
 const BACKGROUND_OPTIONS: { value: BackgroundTheme; label: string }[] = [
   { value: "auto", label: "Auto" },
@@ -195,6 +196,19 @@ export default function StartScreen() {
   const [presentations, setPresentations] = useState<PresentationSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  // 새로고침 시 localStorage에서 복원
+  useEffect(() => {
+    setPresentations(getStoredPresentations());
+    setHasLoaded(true);
+  }, []);
+
+  // 로드 완료 후, 발표 목록이 바뀔 때마다 저장
+  useEffect(() => {
+    if (!hasLoaded) return;
+    setStoredPresentations(presentations);
+  }, [hasLoaded, presentations]);
 
   const selected = selectedId
     ? presentations.find((p) => p.id === selectedId) ?? null
