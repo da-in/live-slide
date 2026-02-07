@@ -34,6 +34,14 @@ export default function SttSocketPanel() {
       addLog("소켓 끊김");
     });
 
+    socket.on("slide-update", (payload: unknown) => {
+      const p = payload as { type?: string; components?: unknown[] };
+      addLog(
+        `수신(slide-update): type=${p.type ?? "?"} components=${p.components?.length ?? 0}`
+      );
+      addLog(`  payload=${JSON.stringify(payload)}`);
+    });
+
     return () => {
       disconnectSocket();
     };
