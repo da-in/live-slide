@@ -1,0 +1,34 @@
+---
+description: Live Slide의 전체 시스템 아키텍처 및 데이터 흐름 정의. 백엔드와 프론트엔드의 통신 구조를 제어함.
+globs: "**/*"
+---
+
+# System Architecture & Data Flow
+
+## 1. Core Data Flow
+
+모든 기능 개발은 아래의 데이터 흐름 순서를 준수해야 한다:
+
+- **Voice Input + STT**: Browser (Web Speech API) — 마이크 캡처 및 전사 후 **전사 텍스트만** 서버 전송
+- **Orchestrator**: GPT-4o (Intent Analysis via Function Calling)
+- **Action Resolver**: Backend logic processing
+- **Dynamic UI**: Action Payload JSON -> Client-side Chart.js/Tailwind Rendering
+
+## 2. Logical Architecture
+
+- **Client (Browser)**: Audio Capture + STT (Web Speech API) -> 전사 텍스트 WebSocket 전송 -> Canvas Renderer (Chart.js / Tailwind UI)
+- **Backend (FastAPI/Node.js)**: Transcript 수신 -> LLM Orchestrator -> Intent Classifier -> Action Payload Generator
+
+## 3. Communication Protocol
+
+- 클라이언트와 서버는 **WebSocket**을 통해 실시간 전이중 통신을 수행함.
+- **구현**: `socket.io` (서버) / `socket.io-client` (클라이언트)
+- **연결**: 클라이언트가 프레젠테이션 화면 진입 시 `http://localhost:8000`에 자동 연결
+- **이벤트**: 서버는 `slide-update` 이벤트로 `Action Payload JSON`을 클라이언트에 전송함.
+- **클라이언트 → 서버**: `transcript` 이벤트로 전사 텍스트 전송 (Web Speech API 결과)
+
+## 4. Tech Stack
+
+- **Frontend**: Next.js 16, Tailwind CSS, Chart.js, Framer Motion
+- **Backend**: FastAPI (Python) or Node.js
+- **AI**: Web Speech API (브라우저 STT), GPT-4o

@@ -1,0 +1,24 @@
+---
+description: Magic UI 및 Aceternity UI를 활용한 동적 컴포넌트 렌더링 규칙
+globs: "components/canvas/**/*, app/presentation/**/*"
+---
+
+# Dynamic Rendering & Animation Rules
+
+## 1. UI Library Strategy
+
+- **Base**: `Shadcn UI` (기본 UI 구조)
+- **Animation**: `Magic UI` (텍스트 및 카드 인터랙션), `Aceternity UI` (배경 및 특수 효과)
+- **Motion Engine**: `Framer Motion`을 모든 동적 컴포넌트에 필수 적용.
+
+## 2. Component Resolver Logic
+
+- 모든 슬라이드 요소는 `ComponentMapper`를 통해 매핑한다.
+- 서버에서 오는 `Action Payload`의 `type` 필드에 따라 적절한 컴포넌트를 동적 로드(Dynamic Import)한다.
+- 예시: `type: "TEXT_BLOCK"` -> `Magic UI의 WordPullUp` 컴포넌트 매핑.
+
+## 3. Animation Guidelines
+
+- **Enter/Exit**: 컴포넌트가 나타날 때 `opacity: 0 -> 1`, `y: 20 -> 0` 정도의 부드러운 상승 효과를 기본으로 한다.
+- **Stagger**: 목록이나 표의 행(Row)은 순차적으로 나타나도록 `staggerChildren`을 적용한다.
+- **Chart**: Chart.js의 `options.animation`을 활성화하여 데이터 변화를 시각적으로 강조한다.

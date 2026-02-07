@@ -1,0 +1,22 @@
+---
+description: Live Slide의 제품 비전 및 사용자 페르소나 정의.
+globs: "**/*"
+---
+
+# Project: Live Slide
+
+## Vision: "Zero-Preparation Presentation"
+
+- 연사의 말에 반응하는 **'다이내믹 캔버스'** 제공.
+- 준비 시간 없이 대화만으로 시각 자료가 완성되는 경험.
+
+## User Personas
+
+1. **The Busy Manager**: 회의와 동시에 시각화된 회의록 생성.
+2. **The Agile Closer**: 고객 질문에 즉각적인 데이터 그래프 대응.
+3. **The Interactive Educator**: 질문에 따라 실시간 도식 및 이미지 생성.
+
+## Interaction Principles
+
+- "말하는 대로 그려진다"는 느낌을 줄 것.
+- 모든 시각적 변화는 부드러운 애니메이션을 동반할 것.
