@@ -8,7 +8,6 @@ import {
   SYSTEM_PROMPT,
   IMAGE_ADDON_PROMPT,
   getUserPrompt,
-  getInitialContextBlock,
 } from "./prompts/index.js";
 import { resolveImageComponents } from "./image.js";
 
@@ -19,8 +18,8 @@ const OLLAMA_URL = "http://localhost:11434/api/chat";
 // const MODEL = "granite4:3b";
 const MODEL = "qwen2.5:7b";
 
-/** 생성 토큰 상한(JSON만 나오면 되므로 작게) */
-const OLLAMA_OPTIONS = { num_predict: 256, num_ctx: 2048 };
+/** 생성 토큰 상한(JSON만 나오면 되므로 작게), 컨텍스트는 대본 포함을 위해 넉넉히 */
+const OLLAMA_OPTIONS = { num_predict: 256, num_ctx: 4096 };
 
 /**
  * 소켓(세션)별 이전 맥락을 저장하는 Map.
@@ -72,31 +71,31 @@ export async function processBatch(batchText, socketId, opts = {}) {
   const ctx = getContext(socketId);
   const startMs = Date.now();
 
-  // ── 시스템 프롬프트: 초기 맥락 + 이미지 트리거 시에만 IMAGE 지시 추가 ──
-  const initialBlock = ctx.initialContext
-    ? getInitialContextBlock(ctx.initialContext.title, ctx.initialContext.context)
-    : "";
-  const systemContent = [
-    SYSTEM_PROMPT,
-    initialBlock,
-    needsImage ? IMAGE_ADDON_PROMPT : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  // ── 시스템 프롬프트: 이미지 트리거 시에만 IMAGE 지시 추가 ──
+  const systemContent = needsImage
+    ? `${SYSTEM_PROMPT}\n${IMAGE_ADDON_PROMPT}`
+    : SYSTEM_PROMPT;
+
+  // ── 유저 프롬프트: 초기 맥락(대본)을 유저 메시지 안에 포함하여 매칭 유도 ──
+  const userContent = getUserPrompt(
+    batchText,
+    ctx.transcript,
+    ctx.slide,
+    ctx.initialContext
+  );
 
   const body = {
     model: MODEL,
     messages: [
       { role: "system", content: systemContent },
-      {
-        role: "user",
-        content: getUserPrompt(batchText, ctx.transcript, ctx.slide),
-      },
+      { role: "user", content: userContent },
     ],
     stream: false,
     format: "json",
     options: OLLAMA_OPTIONS,
   };
+
+  console.log(`[LLM] user prompt:\n${body.messages[1].content}`);
 
   try {
     const res = await fetch(OLLAMA_URL, {

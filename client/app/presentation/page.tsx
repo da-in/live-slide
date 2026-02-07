@@ -6,7 +6,7 @@ import Image from "next/image";
 import { connectSocket, disconnectSocket, emitTranscript, emitInitContext } from "@/lib/socket";
 import { getSpeechRecognition } from "@/lib/speech";
 import type { ActionPayload, SlideComponent } from "@/types/slide";
-import { mapComponent } from "@/lib/component-mapper";
+import SlideLayout from "@/components/canvas/SlideLayout";
 import cursorLogo from "@/assets/cursor-logo.png";
 import cursorKorea from "@/assets/cursur-korea.png";
 
@@ -224,7 +224,7 @@ export default function PresentationPage() {
         {components.length === 0 ? (
           <p className="text-center text-gray-500">슬라이드 내용이 없습니다.</p>
         ) : (
-          components.map((comp, i) => mapComponent(comp, i))
+          <SlideLayout components={components} />
         )}
       </main>
 
