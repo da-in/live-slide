@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Next
+client/.next/
+client/out/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs / OS
+*.log
+.DS_Store
