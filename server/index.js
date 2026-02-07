@@ -19,12 +19,15 @@ app.get("/health", (_, res) => {
 
 attachSocketHandlers(io, {
   async onBatch(socket, batchText) {
+    const onBatchStart = Date.now();
     const payload = await llm.processBatch(batchText, socket.id);
+    const onBatchMs = Date.now() - onBatchStart;
+
     if (payload) {
       socket.emit("slide-update", payload);
       const clientId = socket.id.slice(0, 8);
       console.log(
-        `[${new Date().toISOString()}] [EMIT] slide-update → client=${clientId} type=${payload.type} components=${payload.components?.length ?? 0}`
+        `[${new Date().toISOString()}] [EMIT] slide-update → client=${clientId} type=${payload.type} components=${payload.components?.length ?? 0} (onBatch 총 ${onBatchMs}ms)`
       );
     }
   },
@@ -33,6 +36,7 @@ attachSocketHandlers(io, {
   },
 });
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`Server http+ws listening on http://localhost:${PORT}`);
+  await llm.warmup();
 });

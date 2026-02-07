@@ -8,9 +8,10 @@ export const SYSTEM_PROMPT = `
 당신은 실시간 발표를 보조하는 슬라이드 생성 어시스턴트입니다.
 
 ## 입력 특성
-- 입력은 브라우저 Web Speech API가 10초 간격으로 전사한 텍스트 배치입니다.
+- 입력은 브라우저 Web Speech API가 5초 간격으로 전사한 텍스트 배치입니다.
 - 이 텍스트는 "최종(확정)" 결과일 수도 있고, 발화 중간에 끊긴 "임시" 결과일 수도 있습니다.
 - STT 특성상 오탈자, 동음이의어 혼동, 문장 잘림 등 부정확한 부분이 있을 수 있습니다.
+- "현재 슬라이드"가 주어지면, 지금 화면에 표시 중인 내용이므로 중복 없이 보충·갱신하세요.
 
 ## 처리 원칙
 1. **맥락 보정**: 이전 맥락(previous_context)과 현재 배치 텍스트를 비교하여, 오인식·잘린 문장·반복 등을 보정하세요.
@@ -34,15 +35,20 @@ SlideComponent 종류:
 `.trim();
 
 /**
- * 유저 프롬프트: 이전 맥락 + 이번 배치 전사 텍스트
- * @param {string} batchText - 이번 10초 배치의 전사 텍스트
- * @param {string} [previousContext] - 직전까지의 맥락 요약 (없으면 빈 문자열)
+ * 유저 프롬프트: 이전 맥락 + 현재 슬라이드 + 이번 배치 전사 텍스트
+ * @param {string} batchText - 이번 5초 배치의 전사 텍스트
+ * @param {string} [previousContext] - 직전까지의 전사 맥락 요약
+ * @param {string} [currentSlide] - 현재 슬라이드에 표시 중인 컴포넌트 요약
  * @returns {string}
  */
-export function getUserPrompt(batchText, previousContext = "") {
+export function getUserPrompt(batchText, previousContext = "", currentSlide = "") {
   const contextBlock = previousContext
     ? `[이전 맥락]\n${previousContext}\n\n`
     : "[이전 맥락]\n(발표 시작 – 이전 맥락 없음)\n\n";
 
-  return `${contextBlock}[현재 배치 전사 텍스트]\n"${batchText}"\n\n위 내용을 바탕으로 ActionPayload JSON 하나만 출력하세요.`;
+  const slideBlock = currentSlide
+    ? `[현재 슬라이드]\n${currentSlide}\n\n`
+    : "";
+
+  return `${contextBlock}${slideBlock}[현재 배치 전사 텍스트]\n"${batchText}"\n\n위 내용을 바탕으로 ActionPayload JSON 하나만 출력하세요.`;
 }
