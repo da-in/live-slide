@@ -1,0 +1,19 @@
+{
+  "name": "live-slide",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:client": "pnpm --filter live-slide-client dev",
+    "dev:server": "pnpm --filter live-slide-server dev",
+    "build": "pnpm -r run build",
+    "build:client": "pnpm --filter live-slide-client build",
+    "start": "pnpm --filter live-slide-server start",
+    "start:client": "pnpm --filter live-slide-client start",
+    "lint": "pnpm --filter live-slide-client lint"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@9.14.2"
+}
