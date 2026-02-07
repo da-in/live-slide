@@ -2,12 +2,14 @@
 
 import { useState, useId, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import type { Presentation, BackgroundTheme } from "@/types/presentation";
 import { getStoredPresentations, setStoredPresentations } from "@/lib/presentation-storage";
+import cursorLogo from "@/assets/cursor-logo.png";
 
 const BACKGROUND_OPTIONS: { value: BackgroundTheme; label: string }[] = [
   { value: "auto", label: "Auto" },
-  { value: "hackathon", label: "Hackathon" },
+  { value: "hackathon", label: "Cursor Hackathon" },
 ];
 
 /** 좌측: 발표 목록 + 발표 생성하기 */
@@ -102,28 +104,52 @@ function PresentationForm({
   onContextChange,
   onThemeChange,
   onAttachedFileNamesChange,
+  onTimerChange,
 }: {
   presentation: Presentation | null;
-  onSubmit: (data: { context: string; files: File[]; background: BackgroundTheme }) => void;
+  onSubmit: (data: {
+    context: string;
+    files: File[];
+    background: BackgroundTheme;
+    timerTotalMinutes?: number;
+    timerPhases?: number;
+  }) => void;
   onTitleChange: (title: string) => void;
   onContextChange: (id: string, context: string) => void;
   onThemeChange: (id: string, background: BackgroundTheme) => void;
   onAttachedFileNamesChange: (id: string, names: string[]) => void;
+  onTimerChange: (id: string, timerTotalMinutes?: number, timerPhases?: number) => void;
 }) {
   const [context, setContext] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [background, setBackground] = useState<BackgroundTheme>("auto");
+  const [timerTotalMinutes, setTimerTotalMinutes] = useState<string>("");
+  const [timerPhases, setTimerPhases] = useState<string>("");
 
   const contextId = useId();
   const filesId = useId();
   const backgroundId = useId();
+  const timerMinutesId = useId();
+  const timerPhasesId = useId();
 
   useEffect(() => {
     if (presentation) {
       setContext(presentation.context);
       setBackground(presentation.background);
+      setTimerTotalMinutes(
+        presentation.timerTotalMinutes != null ? String(presentation.timerTotalMinutes) : ""
+      );
+      setTimerPhases(
+        presentation.timerPhases != null ? String(presentation.timerPhases) : ""
+      );
     }
-  }, [presentation?.id, presentation?.context, presentation?.background]);
+  }, [
+    presentation?.id,
+    presentation?.context,
+    presentation?.background,
+    presentation?.timerTotalMinutes,
+    presentation?.timerPhases,
+  ]);
 
   if (!presentation) {
     return (
@@ -135,7 +161,15 @@ function PresentationForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ context, files, background });
+    const totalMin = timerTotalMinutes.trim() ? parseInt(timerTotalMinutes, 10) : undefined;
+    const phases = timerPhases.trim() ? parseInt(timerPhases, 10) : undefined;
+    onSubmit({
+      context,
+      files,
+      background,
+      timerTotalMinutes: totalMin != null && totalMin > 0 ? totalMin : undefined,
+      timerPhases: phases != null && phases > 0 ? phases : undefined,
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -189,11 +223,15 @@ function PresentationForm({
           <label htmlFor={backgroundId} className="mb-1.5 block text-sm font-medium text-gray-700">
             발표 테마
           </label>
-          <div id={backgroundId} className="flex flex-wrap gap-2">
+          <div id={backgroundId} className="flex flex-wrap gap-3">
             {BACKGROUND_OPTIONS.map((opt) => (
               <label
                 key={opt.value}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 transition has-[:checked]:border-gray-900 has-[:checked]:bg-gray-50"
+                className={`flex cursor-pointer flex-col overflow-hidden rounded-lg border-2 transition ${
+                  background === opt.value
+                    ? "border-gray-900 bg-gray-50"
+                    : "border-gray-300 hover:border-gray-400"
+                }`}
               >
                 <input
                   type="radio"
@@ -204,9 +242,28 @@ function PresentationForm({
                     setBackground(opt.value);
                     onThemeChange(presentation.id, opt.value);
                   }}
-                  className="h-4 w-4 border-gray-300 text-gray-900 focus:ring-gray-900"
+                  className="sr-only"
                 />
-                <span className="text-sm text-gray-700">{opt.label}</span>
+                <span
+                  className={`flex h-20 w-36 items-center justify-center shrink-0 ${
+                    opt.value === "hackathon" ? "bg-black" : "bg-gray-700"
+                  }`}
+                >
+                  {opt.value === "auto" ? (
+                    <span className="text-xs text-gray-300">기본</span>
+                  ) : (
+                    <Image
+                      src={cursorLogo}
+                      alt=""
+                      width={96}
+                      height={32}
+                      className="h-8 w-auto object-contain"
+                    />
+                  )}
+                </span>
+                <span className="border-t border-gray-200 bg-white px-3 py-2 text-center text-sm font-medium text-gray-700">
+                  {opt.label}
+                </span>
               </label>
             ))}
           </div>
@@ -230,6 +287,69 @@ function PresentationForm({
               {files.length > 0
                 ? `${files.length}개 파일 선택됨`
                 : `이전 선택: ${presentation.attachedFileNames.join(", ")}`}
+            </p>
+          )}
+        </div>
+
+        {/* 타이머 설정 (선택) */}
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-gray-700">
+            타이머 (선택)
+          </label>
+          <p className="text-sm text-gray-500">
+            전체 발표 시간과 Phase 수를 입력하면, 발표 화면 우측 하단에 Phase별 카운트와 총 타이머가 표시됩니다.
+          </p>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[120px]">
+              <label htmlFor={timerMinutesId} className="mb-1 block text-xs text-gray-500">
+                전체 발표 시간 (분)
+              </label>
+              <input
+                id={timerMinutesId}
+                type="number"
+                min={1}
+                placeholder="예: 2"
+                value={timerTotalMinutes}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTimerTotalMinutes(v);
+                  const n = v.trim() ? parseInt(v, 10) : undefined;
+                  onTimerChange(
+                    presentation.id,
+                    n != null && n > 0 ? n : undefined,
+                    timerPhases.trim() ? parseInt(timerPhases, 10) : undefined
+                  );
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+              />
+            </div>
+            <div className="flex-1 min-w-[120px]">
+              <label htmlFor={timerPhasesId} className="mb-1 block text-xs text-gray-500">
+                Phase 수
+              </label>
+              <input
+                id={timerPhasesId}
+                type="number"
+                min={1}
+                placeholder="예: 8"
+                value={timerPhases}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTimerPhases(v);
+                  const n = v.trim() ? parseInt(v, 10) : undefined;
+                  onTimerChange(
+                    presentation.id,
+                    timerTotalMinutes.trim() ? parseInt(timerTotalMinutes, 10) : undefined,
+                    n != null && n > 0 ? n : undefined
+                  );
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+              />
+            </div>
+          </div>
+          {timerTotalMinutes && timerPhases && (
+            <p className="text-xs text-gray-500">
+              → Phase당 {Math.round((parseInt(timerTotalMinutes, 10) * 60) / parseInt(timerPhases, 10))}초
             </p>
           )}
         </div>
@@ -310,14 +430,48 @@ export default function StartScreen() {
     );
   };
 
+  const handleTimerChange = (
+    id: string,
+    timerTotalMinutes?: number,
+    timerPhases?: number
+  ) => {
+    setPresentations((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, timerTotalMinutes, timerPhases } : p
+      )
+    );
+  };
+
   const handleDelete = (id: string) => {
     setPresentations((prev) => prev.filter((p) => p.id !== id));
     if (selectedId === id) setSelectedId(null);
   };
 
-  const handleSubmit = (data: { context: string; files: File[]; background: BackgroundTheme }) => {
+  const handleSubmit = (data: {
+    context: string;
+    files: File[];
+    background: BackgroundTheme;
+    timerTotalMinutes?: number;
+    timerPhases?: number;
+  }) => {
     try {
       sessionStorage.setItem("live-slide-theme", data.background);
+      if (
+        data.timerTotalMinutes != null &&
+        data.timerTotalMinutes > 0 &&
+        data.timerPhases != null &&
+        data.timerPhases > 0
+      ) {
+        sessionStorage.setItem(
+          "live-slide-timer",
+          JSON.stringify({
+            totalSeconds: data.timerTotalMinutes * 60,
+            phases: data.timerPhases,
+          })
+        );
+      } else {
+        sessionStorage.removeItem("live-slide-timer");
+      }
     } catch {
       // ignore
     }
@@ -352,6 +506,7 @@ export default function StartScreen() {
           onContextChange={handleContextChange}
           onThemeChange={handleThemeChange}
           onAttachedFileNamesChange={handleAttachedFileNamesChange}
+          onTimerChange={handleTimerChange}
         />
       </div>
     </div>

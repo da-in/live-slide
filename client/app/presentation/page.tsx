@@ -47,6 +47,13 @@ function applyPayload(current: SlideComponent[], payload: ActionPayload): SlideC
 }
 
 const THEME_STORAGE_KEY = "live-slide-theme";
+const TIMER_STORAGE_KEY = "live-slide-timer";
+
+function formatMmSs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 export default function PresentationPage() {
   const router = useRouter();
@@ -55,6 +62,8 @@ export default function PresentationPage() {
   const [subtitle, setSubtitle] = useState("");
   const [connected, setConnected] = useState(false);
   const [theme, setTheme] = useState<"auto" | "hackathon" | null>(null);
+  const [timerConfig, setTimerConfig] = useState<{ totalSeconds: number; phases: number } | null>(null);
+  const [timerState, setTimerState] = useState({ elapsed: 0, phaseIndex: 0, phaseSecondsLeft: 0 });
 
   useEffect(() => {
     try {
@@ -64,6 +73,45 @@ export default function PresentationPage() {
       setTheme("auto");
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(TIMER_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { totalSeconds?: number; phases?: number };
+      const totalSeconds = Number(parsed?.totalSeconds);
+      const phases = Number(parsed?.phases);
+      if (totalSeconds > 0 && phases > 0) {
+        const phaseDuration = Math.floor(totalSeconds / phases);
+        setTimerConfig({ totalSeconds, phases });
+        setTimerState({ elapsed: 0, phaseIndex: 0, phaseSecondsLeft: phaseDuration });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!timerConfig) return;
+    const phaseDuration = Math.floor(timerConfig.totalSeconds / timerConfig.phases);
+    const id = setInterval(() => {
+      setTimerState((prev) => {
+        const nextElapsed = prev.elapsed + 1;
+        let nextPhaseIndex = prev.phaseIndex;
+        let nextPhaseLeft = prev.phaseSecondsLeft - 1;
+        if (nextPhaseLeft < 0) {
+          if (prev.phaseIndex + 1 < timerConfig.phases) {
+            nextPhaseIndex = prev.phaseIndex + 1;
+            nextPhaseLeft = phaseDuration;
+          } else {
+            nextPhaseLeft = 0;
+          }
+        }
+        return { elapsed: nextElapsed, phaseIndex: nextPhaseIndex, phaseSecondsLeft: nextPhaseLeft };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timerConfig]);
 
   useEffect(() => {
     const t = requestAnimationFrame(() => {
@@ -175,17 +223,29 @@ export default function PresentationPage() {
         <span>{connected ? "서버 연결됨 (localhost:8000)" : "서버 미연결"}</span>
       </div>
 
-      <a
-        href="/"
-        onClick={(e) => {
-          e.preventDefault();
-          router.push("/");
-        }}
-        className="fixed bottom-4 right-4 rounded px-2.5 py-1.5 text-xs text-gray-500 opacity-40 transition-opacity duration-200 hover:opacity-90 focus:opacity-90 focus:outline-none"
-        aria-label="발표 종료"
-      >
-        발표 종료
-      </a>
+      <div className="fixed bottom-4 right-4 z-10 flex flex-col items-end gap-2">
+        {timerConfig ? (
+          <div className="rounded-lg bg-black/60 px-3 py-2 text-right text-xs text-white">
+            <div>
+              Phase {timerState.phaseIndex + 1}/{timerConfig.phases} · {formatMmSs(timerState.phaseSecondsLeft)}
+            </div>
+            <div>
+              {formatMmSs(timerState.elapsed)} / {formatMmSs(timerConfig.totalSeconds)}
+            </div>
+          </div>
+        ) : null}
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            router.push("/");
+          }}
+          className="rounded px-2.5 py-1.5 text-xs text-gray-500 opacity-40 transition-opacity duration-200 hover:opacity-90 focus:opacity-90 focus:outline-none"
+          aria-label="발표 종료"
+        >
+          발표 종료
+        </a>
+      </div>
     </div>
   );
 }

@@ -13,6 +13,10 @@ export interface Presentation {
   background: BackgroundTheme;
   /** 활용할 자료 파일 이름 (실제 File은 저장 불가, 이름만 보관) */
   attachedFileNames: string[];
+  /** 타이머: 전체 발표 시간(분), 선택 */
+  timerTotalMinutes?: number;
+  /** 타이머: Phase 수, 선택 */
+  timerPhases?: number;
 }
 
 /** @deprecated 목록용은 Presentation 사용 */

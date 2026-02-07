@@ -17,7 +17,20 @@ function normalizePresentation(raw: unknown): Presentation | null {
   const attachedFileNames = Array.isArray(o.attachedFileNames)
     ? (o.attachedFileNames as unknown[]).filter((x): x is string => typeof x === "string")
     : [];
-  return { id, title, createdAt, context, background, attachedFileNames };
+  const timerTotalMinutes =
+    typeof o.timerTotalMinutes === "number" && o.timerTotalMinutes > 0 ? o.timerTotalMinutes : undefined;
+  const timerPhases =
+    typeof o.timerPhases === "number" && o.timerPhases > 0 ? o.timerPhases : undefined;
+  return {
+    id,
+    title,
+    createdAt,
+    context,
+    background,
+    attachedFileNames,
+    timerTotalMinutes,
+    timerPhases,
+  };
 }
 
 export function getStoredPresentations(): Presentation[] {
