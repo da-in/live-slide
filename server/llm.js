@@ -1,9 +1,14 @@
 /**
- * LLM 호출 (Ollama translategemma:12b).
+ * LLM 호출 (Ollama).
  * 전사 배치 텍스트를 받아 의도 분석 후 ActionPayload를 반환한다.
+ * IMAGE 컴포넌트는 코드 레벨 트리거로만 생성된다 (needsImage 플래그).
  */
 
-import { SYSTEM_PROMPT, getUserPrompt } from "./prompts/index.js";
+import {
+  SYSTEM_PROMPT,
+  IMAGE_ADDON_PROMPT,
+  getUserPrompt,
+} from "./prompts/index.js";
 import { resolveImageComponents } from "./image.js";
 
 const OLLAMA_URL = "http://localhost:11434/api/chat";
@@ -11,8 +16,9 @@ const OLLAMA_URL = "http://localhost:11434/api/chat";
 // const MODEL = "translategemma:12b";
 // const MODEL = "translategemma:4b";
 const MODEL = "granite4:3b";
+// const MODEL = "qwen2.5:7b";
 
-/** 생성 토큰 상한(JSON만 나오면 되므로 작게), 컨텍스트 창(입력 길이 제한으로 처리 속도 유리) */
+/** 생성 토큰 상한(JSON만 나오면 되므로 작게) */
 const OLLAMA_OPTIONS = { num_predict: 256, num_ctx: 2048 };
 
 /**
@@ -56,17 +62,27 @@ export function clearContext(socketId) {
  * Ollama chat API 호출
  * @param {string} batchText - 이번 5초 배치의 전사 텍스트
  * @param {string} socketId - 소켓 ID (맥락 관리용)
+ * @param {{ needsImage?: boolean }} [opts] - 옵션 (이미지 트리거 여부)
  * @returns {Promise<object|null>} ActionPayload 또는 null
  */
-export async function processBatch(batchText, socketId) {
+export async function processBatch(batchText, socketId, opts = {}) {
+  const { needsImage = false } = opts;
   const ctx = getContext(socketId);
   const startMs = Date.now();
+
+  // ── 시스템 프롬프트: 이미지 트리거 시에만 IMAGE 지시 추가 ──
+  const systemContent = needsImage
+    ? `${SYSTEM_PROMPT}\n\n${IMAGE_ADDON_PROMPT}`
+    : SYSTEM_PROMPT;
 
   const body = {
     model: MODEL,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: getUserPrompt(batchText, ctx.transcript, ctx.slide) },
+      { role: "system", content: systemContent },
+      {
+        role: "user",
+        content: getUserPrompt(batchText, ctx.transcript, ctx.slide),
+      },
     ],
     stream: false,
     format: "json",
@@ -90,8 +106,26 @@ export async function processBatch(batchText, socketId) {
 
     let payload = JSON.parse(raw);
 
-    // ── IMAGE 컴포넌트의 키워드를 실제 URL로 교체 ──
-    payload = await resolveImageComponents(payload);
+    // ── 이미지 트리거: LLM이 IMAGE를 안 만들었으면 TITLE/DESCRIPTION에서 키워드 추출하여 직접 추가 ──
+    if (needsImage) {
+      const hasImage = (payload.components ?? []).some((c) => c.type === "IMAGE");
+      if (!hasImage) {
+        // TITLE 또는 첫 DESCRIPTION의 content를 검색 키워드로 사용
+        const titleComp = (payload.components ?? []).find((c) => c.type === "TITLE");
+        const descComp = (payload.components ?? []).find((c) => c.type === "DESCRIPTION");
+        const keyword = titleComp?.content || descComp?.content || "";
+        if (keyword) {
+          console.log(`[IMAGE-FALLBACK] LLM이 IMAGE 미생성 → "${keyword}" 로 직접 검색`);
+          payload.components = payload.components ?? [];
+          payload.components.push({
+            type: "IMAGE",
+            src: keyword,
+            alt: keyword,
+          });
+        }
+      }
+      payload = await resolveImageComponents(payload);
+    }
 
     // ── 맥락 갱신 ──
     // 전사: 최근 3건 유지
@@ -112,7 +146,7 @@ export async function processBatch(batchText, socketId) {
 
     const elapsed = Date.now() - startMs;
     console.log(
-      `[${new Date().toISOString()}] [LLM] model=${MODEL} type=${
+      `[${new Date().toISOString()}] [LLM] model=${MODEL} needsImage=${needsImage} type=${
         payload.type
       } components=${payload.components?.length ?? 0} ${elapsed}ms`
     );

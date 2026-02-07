@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -17,10 +18,30 @@ app.get("/health", (_, res) => {
   res.json({ ok: true, message: "Live Slide server" });
 });
 
+/* ── 이미지 트리거 키워드 감지 ── */
+const IMAGE_TRIGGER_RE = /이미지|사진|그림|보여\s?줘|보여\s?주세요/;
+
+/**
+ * 배치 텍스트에 이미지 트리거 키워드가 포함되어 있는지 확인한다.
+ * @param {string} text
+ * @returns {boolean}
+ */
+function detectImageTrigger(text) {
+  return IMAGE_TRIGGER_RE.test(text);
+}
+
 attachSocketHandlers(io, {
   async onBatch(socket, batchText) {
     const onBatchStart = Date.now();
-    const payload = await llm.processBatch(batchText, socket.id);
+    const needsImage = detectImageTrigger(batchText);
+
+    if (needsImage) {
+      console.log(
+        `[${new Date().toISOString()}] [IMAGE-TRIGGER] 키워드 감지: "${batchText}"`
+      );
+    }
+
+    const payload = await llm.processBatch(batchText, socket.id, { needsImage });
     const onBatchMs = Date.now() - onBatchStart;
 
     if (payload) {
