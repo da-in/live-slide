@@ -38,6 +38,22 @@ IMAGE 형식: {"type":"IMAGE","src":"영문 검색 키워드 2~4단어","alt":"�
 예: {"type":"IMAGE","src":"electric vehicle charging","alt":"전기차 충전소"}`.trim();
 
 /**
+ * 발표 시작 시 입력된 제목·사전 정보를 시스템 프롬프트에 추가할 블록.
+ * @param {string} title - 발표 제목
+ * @param {string} context - 사전 정보
+ * @returns {string}
+ */
+export function getInitialContextBlock(title = "", context = "") {
+  const parts = [];
+  if (title) parts.push(`발표 제목: ${title}`);
+  if (context) parts.push(`사전 정보:\n${context}`);
+  if (parts.length === 0) return "";
+  return `[발표 배경]\n${parts.join("\n")}
+
+위 배경 정보를 항상 참고하여 발표 흐름에 맞는 슬라이드를 생성하세요.`;
+}
+
+/**
  * 유저 프롬프트: 이전 맥락 + 현재 슬라이드 + 이번 배치 전사 텍스트
  * @param {string} batchText - 이번 5초 배치의 전사 텍스트
  * @param {string} [previousContext] - 직전까지의 전사 맥락 요약

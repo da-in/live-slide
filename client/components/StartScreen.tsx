@@ -2,7 +2,6 @@
 
 import { useState, useId, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import type { Presentation, BackgroundTheme } from "@/types/presentation";
 import { getStoredPresentations, setStoredPresentations } from "@/lib/presentation-storage";
 import cursorLogo from "@/assets/cursor-logo.png";
@@ -252,8 +251,8 @@ function PresentationForm({
                   {opt.value === "auto" ? (
                     <span className="text-xs text-gray-300">기본</span>
                   ) : (
-                    <Image
-                      src={cursorLogo}
+                    <img
+                      src={typeof cursorLogo === "string" ? cursorLogo : cursorLogo.src}
                       alt=""
                       width={96}
                       height={32}
@@ -456,6 +455,14 @@ export default function StartScreen() {
   }) => {
     try {
       sessionStorage.setItem("live-slide-theme", data.background);
+      // 발표 제목 + 사전 정보를 저장하여 프롬프트 초기 맥락으로 사용
+      sessionStorage.setItem(
+        "live-slide-init-context",
+        JSON.stringify({
+          title: selected?.title ?? "",
+          context: data.context,
+        })
+      );
       if (
         data.timerTotalMinutes != null &&
         data.timerTotalMinutes > 0 &&

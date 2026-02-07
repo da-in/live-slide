@@ -15,10 +15,11 @@ const BATCH_INTERVAL_MS = 5 * 1000; // 5초
  * @param {import("socket.io").Server} io
  * @param {{
  *   onBatch: (socket: import("socket.io").Socket, batchText: string) => void | Promise<void>,
+ *   onInitContext?: (socketId: string, data: { title: string, context: string }) => void,
  *   onDisconnect?: (socketId: string) => void
  * }} options
  */
-export function attachSocketHandlers(io, { onBatch, onDisconnect }) {
+export function attachSocketHandlers(io, { onBatch, onInitContext, onDisconnect }) {
   io.on("connection", (socket) => {
     const clientId = socket.id.slice(0, 8);
     console.log(`[${new Date().toISOString()}] [CONNECT] client=${clientId}`);
@@ -32,6 +33,18 @@ export function attachSocketHandlers(io, { onBatch, onDisconnect }) {
     let pendingText = "";     // lock 중 누적된 텍스트
     /** 직전에 onBatch로 보낸 텍스트 — 동일하면 중복 호출 방지 */
     let lastProcessedBatch = "";
+
+    /* ── 발표 초기 맥락 수신 (제목 + 사전 정보) ── */
+    socket.on("init-context", (payload) => {
+      const title = typeof payload?.title === "string" ? payload.title.trim() : "";
+      const context = typeof payload?.context === "string" ? payload.context.trim() : "";
+      if (title || context) {
+        console.log(
+          `[${new Date().toISOString()}] [INIT-CONTEXT] client=${clientId} title="${title}" context="${context.slice(0, 60)}..."`
+        );
+        onInitContext?.(socket.id, { title, context });
+      }
+    });
 
     socket.on("transcript", (payload) => {
       const { text, isFinal } = payload ?? {};

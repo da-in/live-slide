@@ -31,6 +31,9 @@ function detectImageTrigger(text) {
 }
 
 attachSocketHandlers(io, {
+  onInitContext(socketId, { title, context }) {
+    llm.setContext(socketId, { initialContext: { title, context } });
+  },
   async onBatch(socket, batchText) {
     const onBatchStart = Date.now();
     const needsImage = detectImageTrigger(batchText);

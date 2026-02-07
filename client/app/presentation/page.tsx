@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { connectSocket, disconnectSocket, emitTranscript } from "@/lib/socket";
+import { connectSocket, disconnectSocket, emitTranscript, emitInitContext } from "@/lib/socket";
 import { getSpeechRecognition } from "@/lib/speech";
 import type { ActionPayload, SlideComponent } from "@/types/slide";
 import { mapComponent } from "@/lib/component-mapper";
@@ -124,7 +124,30 @@ export default function PresentationPage() {
     const socket = connectSocket();
     setConnected(socket.connected);
 
-    socket.on("connect", () => setConnected(true));
+    // 발표 제목·사전 정보를 서버로 전송하여 프롬프트 초기 맥락 설정
+    const sendInitContext = () => {
+      try {
+        const raw = sessionStorage.getItem("live-slide-init-context");
+        if (raw) {
+          const { title, context } = JSON.parse(raw) as { title?: string; context?: string };
+          if (title || context) {
+            emitInitContext(title ?? "", context ?? "");
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    socket.on("connect", () => {
+      setConnected(true);
+      sendInitContext();
+    });
+    // 이미 연결되어 있으면 즉시 전송
+    if (socket.connected) {
+      sendInitContext();
+    }
+
     socket.on("disconnect", () => setConnected(false));
 
     const onSlideUpdate = (payload: unknown) => {

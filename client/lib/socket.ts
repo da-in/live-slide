@@ -29,3 +29,10 @@ export function emitTranscript(text: string, isFinal: boolean): void {
     socket.emit("transcript", { text, isFinal });
   }
 }
+
+/** 발표 시작 시 제목·사전 정보를 서버로 전송하여 프롬프트 초기 맥락으로 설정 */
+export function emitInitContext(title: string, context: string): void {
+  if (socket?.connected) {
+    socket.emit("init-context", { title, context });
+  }
+}
